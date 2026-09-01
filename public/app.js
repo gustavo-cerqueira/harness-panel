@@ -12,7 +12,6 @@
  * panel would hide exactly the drift this tool exists to surface.
  */
 
-const OWNER_ONLY = /^ANTHROPIC_MODEL|_AGENT_MODEL$|^EZ_ALL_AGENTS_MODEL$|_CLASSIFIER_MODEL$/;
 
 /**
  * WHICH HARNESS this panel is inventorying.
@@ -24,13 +23,16 @@ const OWNER_ONLY = /^ANTHROPIC_MODEL|_AGENT_MODEL$|^EZ_ALL_AGENTS_MODEL$|_CLASSI
  * the Codex view for whoever receives the link, which a stored preference alone
  * could never do. That is also why the URL beats localStorage on load.
  */
-const HARNESS_STORAGE_KEY = 'ezharness.harness';
+const HARNESS_STORAGE_KEY = 'harness-panel.harness';
+/** What this preference was called before the panel was renamed; still read so
+ * a choice somebody already made is not silently forgotten. */
+const LEGACY_HARNESS_STORAGE_KEY = 'ezharness.harness';
 const HARNESS_LABELS = { claude: 'Claude Code', codex: 'Codex CLI' };
 const DEFAULT_HARNESS = 'claude';
 
 function storedHarness() {
 	try {
-		return localStorage.getItem(HARNESS_STORAGE_KEY);
+		return localStorage.getItem(HARNESS_STORAGE_KEY) ?? localStorage.getItem(LEGACY_HARNESS_STORAGE_KEY);
 	} catch {
 		return null; // storage disabled or blocked: the panel still works
 	}
@@ -949,7 +951,7 @@ const ADAPTERS = {
 						: null,
 					union && contributors.length ? { text: `merged from ${contributors.join(' + ')}`, kind: 'ok' } : null,
 					key.known === false ? { text: 'unknown key', kind: 'bad' } : null,
-					key.ownerOnly || OWNER_ONLY.test(key.key) ? { text: 'owner-only — do not change', kind: 'owner' } : null,
+					key.ownerOnly ? { text: 'owner-only — do not change', kind: 'owner' } : null,
 					key.secret ? { text: 'masked', kind: 'warn' } : null,
 					// Several layers holding a union key is cooperation, not conflict:
 					// nothing is being overridden, so the warning would be a false alarm.
@@ -1757,25 +1759,23 @@ function renderSection(id, label, payload, ctx) {
  * dropped rather than allowed to throw mid-render; the server already warns.
  */
 let activeBypasses = [];
+const matchesBypass = (entry, name) =>
+	Boolean(entry.needle) &&
+	String(name ?? '')
+		.toLowerCase()
+		.includes(entry.needle);
 const bypassBadgeFor = (name) =>
-	activeBypasses.some((entry) => entry.matcher && entry.matcher.test(String(name || '')))
-		? { text: 'known bypass', kind: 'bad' }
-		: null;
+	activeBypasses.some((entry) => matchesBypass(entry, name)) ? { text: 'known bypass', kind: 'bad' } : null;
 
 function compileBypasses(curation) {
-	const out = [];
-	for (const entry of curation?.bypasses ?? []) {
-		let matcher = null;
-		if (typeof entry.match === 'string') {
-			try {
-				matcher = new RegExp(entry.match);
-			} catch {
-				continue;
-			}
-		}
-		out.push({ ...entry, matcher });
-	}
-	return out;
+	// `match` is literal, lower-cased once here. It is NOT a regular expression:
+	// the pattern and the names it runs against both come from the inventoried
+	// repository, so an engine that can backtrack would let that repository hang
+	// this tab on load. `lib/curation.mjs` states the same rule server-side.
+	return (curation?.bypasses ?? []).map((entry) => ({
+		...entry,
+		needle: typeof entry.match === 'string' && entry.match ? entry.match.toLowerCase() : null,
+	}));
 }
 
 /**
@@ -1784,7 +1784,7 @@ function compileBypasses(curation) {
  * that failed simply contributes nothing rather than faking rows.
  */
 function collectGuardrails(state, ctx, bypasses = []) {
-	const bypassOf = (name) => bypasses.find((b) => b.matcher && b.matcher.test(String(name || '')));
+	const bypassOf = (name) => bypasses.find((entry) => matchesBypass(entry, name));
 	const codex = ctx.harness === 'codex';
 	const sections = state.sections ?? {};
 	const listOf = (id, keys) => {

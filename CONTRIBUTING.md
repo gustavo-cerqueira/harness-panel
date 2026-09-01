@@ -7,6 +7,15 @@ node --test test/*.test.mjs
 Every change ships with a test, and the suite must stay green. There are no
 dependencies and no build step: Node 22 built-ins only, no `package.json`.
 
+A few tests are "reality checks": they run the scanners against your actual
+machine when the thing they need is there, and skip with the precondition
+stated when it is not. Point them at a real, fully configured repository to
+make them fire:
+
+```bash
+HARNESS_REALITY_REPO=/path/to/a/real/repo node --test test/*.test.mjs
+```
+
 Three rules carry most of the design:
 
 - **The panel never writes.** No `writeFile`, `rm`, `rename`, `mkdir` or

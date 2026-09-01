@@ -165,9 +165,15 @@ at `.claude/harness-curation.json`:
 }
 ```
 
-`match` is a regular expression against the guard's row title; omit it for a
-hole that belongs to no single row (a git-level gate, an unenforced policy) and
-it is listed on its own. Cluster ids are the eleven in `lib/taxonomy.mjs`.
+`match` is literal text, matched case-insensitively anywhere in the guard's row
+title — never a regular expression, so a curation file can never hand the panel
+a pattern that hangs it. Omit `match` for a hole that belongs to no single row
+(a git-level gate, an unenforced policy) and it is listed on its own. Cluster
+ids are the eleven in `lib/taxonomy.mjs`.
+
+`ownerOnlyKeys` is a third, optional list: settings keys that only their owner
+may change, matched the same literal way, badged "owner-only — do not change"
+wherever they appear. Nothing is owner-only unless your workspace says so.
 
 Without this file the Guardrails view says so in as many words: an empty bypass
 table means nobody has looked, which is not the same as nothing to find.

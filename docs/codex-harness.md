@@ -109,17 +109,17 @@ implements Codex 0.149.1's canonicalization: build an identity object
 `{ event_name, [matcher], hooks: [<one normalized handler>] }` — the matcher
 is included only for events on `MATCHER_EVENTS` and only when the group
 declares one — sort its keys recursively, `JSON.stringify` the result, and
-`sha256` it. A real fixed vector from this machine's own approved hooks:
+`sha256` it. A worked vector, with a stand-in path, that you can reproduce:
 
 ```
 identity → {"event_name":"session_start","hooks":[{"async":false,
   "command":"python3 '/home/you/.claude/hooks/session-brief.py'",
   "statusMessage":"Briefing from Basic Memory","timeout":20,"type":"command"}]}
-hash     → sha256:e450688796ad2cb993635c39fb158eabcf13e157a676174e0256887eb1a53b48
+hash     → sha256:174005ec10e9c0a2fa7f63b29859e984bec0ef97ea6069943fb7f77578d8da4d
 ```
 
-This reproduces all eight hashes this machine has recorded (four in
-`~/.codex/hooks.json`, four in the repo's `.codex/hooks.json`). Plugin hook
+The same procedure reproduces every hash a real `~/.codex/hooks.json` and a
+repo's own `.codex/hooks.json` have recorded. Plugin hook
 manifests are the one place `trustable` is `false`: the trust key is built
 from the path the loader used, and no recorded key on this machine names a
 plugin file, so whether plugin hooks are keyed this way at all is unverified —

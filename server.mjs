@@ -467,7 +467,7 @@ export function createPanelServer({ home = os.homedir(), projectRoot = process.c
 	const startedAt = new Date().toISOString();
 	let boundPort = null;
 
-	// Optional build stamp written by the ezharness launcher next to this file.
+	// Optional build stamp a launcher may write next to this file.
 	// Comparing it against what the launcher is about to install is the only
 	// reliable staleness check: `git archive` preserves original mtimes, so file
 	// times say nothing, and boot time is UTC while file times are local.
@@ -571,7 +571,7 @@ export function createPanelServer({ home = os.homedir(), projectRoot = process.c
 	 * error row carrying the real message — never fabricated data, never a
 	 * silent empty section.
 	 */
-	async function runSection(section, root) {
+	async function runSection(section, root, curation) {
 		const modulePath = path.join(LIB_DIR, section.module);
 		try {
 			const mod = await import(`file://${modulePath}`);
@@ -579,7 +579,7 @@ export function createPanelServer({ home = os.homedir(), projectRoot = process.c
 			if (typeof fn !== 'function') {
 				return { ok: false, error: `${section.module} does not export ${section.fn}()`, modulePath };
 			}
-			const data = await fn({ home, projectRoot: root });
+			const data = await fn({ home, projectRoot: root, curation });
 			return { ok: true, data, modulePath };
 		} catch (error) {
 			return { ok: false, error: String(error?.stack || error?.message || error), modulePath };
@@ -851,22 +851,32 @@ export function createPanelServer({ home = os.homedir(), projectRoot = process.c
 		if (!force && hit && now - hit.at < STATE_CACHE_MS) return hit.state;
 		if (force) usageCache.delete(key);
 
+		// Read per ROOT and before the scanners: switching working tree switches
+		// which workspace's curation applies, and the settings scanner needs it
+		// while it builds its rows rather than after.
+		const curation = (() => {
+			try {
+				return readCuration({ projectRoot: root });
+			} catch (error) {
+				return {
+					path: null,
+					exists: false,
+					error: String(error?.message || error),
+					warnings: [],
+					bypasses: [],
+					ownerOnlyKeys: [],
+					clusters: null,
+				};
+			}
+		})();
+
 		const results = await Promise.all(
-			entry.sections.map(async (section) => [section.id, { ...section, ...(await runSection(section, root)) }]),
+			entry.sections.map(async (section) => [section.id, { ...section, ...(await runSection(section, root, curation)) }]),
 		);
 		const sections = Object.fromEntries(results);
 
 		const usage = await usageFor(entry, root);
 		mergeUsage(sections, usage);
-		// Read per ROOT, not per process: switching working tree switches which
-		// workspace's curation applies, the same way every other fact does.
-		const curation = (() => {
-			try {
-				return readCuration({ projectRoot: root });
-			} catch (error) {
-				return { path: null, exists: false, error: String(error?.message || error), warnings: [], bypasses: [], clusters: null };
-			}
-		})();
 		tagClusters(sections, curation);
 		const state = {
 			generatedAt: new Date().toISOString(),

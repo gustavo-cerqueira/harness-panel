@@ -433,33 +433,44 @@ test('an unknown key is flagged so a typo cannot hide', (t) => {
 	assert.equal(KNOWN_SETTING_KEYS.includes('modle'), false);
 });
 
-test('owner-only model keys are badged wherever they appear', (t) => {
-	const { home, projectRoot } = fixture(t, {
-		userSettings: json({
-			env: {
-				ANTHROPIC_MODEL: 'claude-opus-4',
-				ANTHROPIC_MODEL_FALLBACK: 'claude-haiku-4',
-				EZAPPS_AGENT_MODEL: 'claude-sonnet-4',
-				EZ_ALL_AGENTS_MODEL: 'claude-opus-4',
-				EZ_INTENT_CLASSIFIER_MODEL: 'claude-haiku-4',
-				HARMLESS_VAR: 'ok',
-			},
-			model: 'opus',
-		}),
-	});
+// Which keys only their owner may change is the inventoried repository's
+// policy, declared in its curation file. The merge applies that list and
+// invents nothing: the same settings with no curation badge nothing at all.
+const OWNER_FIXTURE = {
+	userSettings: json({
+		env: {
+			ANTHROPIC_MODEL: 'claude-opus-4',
+			ANTHROPIC_MODEL_FALLBACK: 'claude-haiku-4',
+			ACME_AGENT_MODEL: 'claude-sonnet-4',
+			ACME_INTENT_CLASSIFIER_MODEL: 'claude-haiku-4',
+			HARMLESS_VAR: 'ok',
+		},
+		model: 'opus',
+	}),
+};
 
-	const result = mergeSettings({ home, projectRoot });
+test('a declared owner-only key is badged wherever it appears', (t) => {
+	const { home, projectRoot } = fixture(t, OWNER_FIXTURE);
+	const curation = { ownerOnlyKeys: ['ANTHROPIC_MODEL', '_AGENT_MODEL', '_CLASSIFIER_MODEL'] };
+	const result = mergeSettings({ home, projectRoot, curation });
 	for (const key of [
 		'env.ANTHROPIC_MODEL',
 		'env.ANTHROPIC_MODEL_FALLBACK',
-		'env.EZAPPS_AGENT_MODEL',
-		'env.EZ_ALL_AGENTS_MODEL',
-		'env.EZ_INTENT_CLASSIFIER_MODEL',
+		'env.ACME_AGENT_MODEL',
+		'env.ACME_INTENT_CLASSIFIER_MODEL',
 	]) {
 		assert.equal(keyOf(result, key).ownerOnly, true, `${key} must be owner-only`);
 	}
 	assert.equal(keyOf(result, 'env.HARMLESS_VAR').ownerOnly, false);
 	assert.equal(keyOf(result, 'model').ownerOnly, false);
+});
+
+test('a workspace that declares no owner-only keys gets no owner-only badges', (t) => {
+	const { home, projectRoot } = fixture(t, OWNER_FIXTURE);
+	const result = mergeSettings({ home, projectRoot });
+	for (const row of result.keys) {
+		assert.equal(row.ownerOnly, false, `${row.key} must not be owner-only without curation`);
+	}
 });
 
 test('a secret in env never appears unmasked anywhere in the result', (t) => {

@@ -3,7 +3,7 @@ import test from 'node:test';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { CURATION_RELATIVE_PATH, readCuration } from '../lib/curation.mjs';
+import { CURATION_RELATIVE_PATH, matchesBypass, readCuration } from '../lib/curation.mjs';
 
 // Curation is workspace DATA, not tool code: the file lives in the repo being
 // inventoried, and the panel ships only the mechanism that reads it.
@@ -59,11 +59,40 @@ test('an unknown cluster id is dropped with a warning, never silently kept', () 
 	assert.ok(result.warnings.some((warning) => /bad/.test(warning) && /not-a-cluster/.test(warning)));
 });
 
-test('a bypass with an uncompilable match is dropped with a warning', () => {
-	const root = makeRoot({ bypasses: [{ guard: 'x', match: '([', text: 'y', verified: 'z' }] });
+test('match is literal text, so a regex-shaped pattern can never run as one', () => {
+	// The pattern and the names it runs against both come from the inventoried
+	// repository, so a real regex engine would let that repository hand the
+	// reader catastrophic backtracking and hang the tab on page load.
+	const pattern = ['^(a+)+', '$'].join('');
+	const root = makeRoot({ bypasses: [{ guard: 'x', match: pattern, text: 'y', verified: 'z' }] });
 	const result = readCuration({ projectRoot: root });
-	assert.deepEqual(result.bypasses, []);
-	assert.ok(result.warnings.some((warning) => /match/i.test(warning)));
+	assert.equal(result.bypasses.length, 1);
+	assert.equal(result.bypasses[0].match, pattern);
+	assert.equal(result.bypasses[0].standalone, false);
+	const started = Date.now();
+	assert.equal(matchesBypass(result.bypasses[0], 'a'.repeat(4000) + '!'), false);
+	assert.ok(Date.now() - started < 500, 'literal matching cannot backtrack');
+});
+
+test('match is case-insensitive and matches anywhere in the name', () => {
+	const root = makeRoot({ bypasses: [{ guard: 'g', match: 'Spec-Lock', text: 't', verified: 'v' }] });
+	const [entry] = readCuration({ projectRoot: root }).bypasses;
+	assert.equal(matchesBypass(entry, '/repo/.claude/hooks/require-spec-lock.sh'), true);
+	assert.equal(matchesBypass(entry, 'something-else.sh'), false);
+	assert.equal(matchesBypass(entry, null), false);
+	assert.equal(matchesBypass({ match: null }, 'anything'), false);
+});
+
+test('ownerOnlyKeys are read as literal substrings, and junk is dropped loudly', () => {
+	const root = makeRoot({ ownerOnlyKeys: ['ANTHROPIC_MODEL', '_AGENT_MODEL', '', 7] });
+	const result = readCuration({ projectRoot: root });
+	assert.deepEqual(result.ownerOnlyKeys, ['ANTHROPIC_MODEL', '_AGENT_MODEL']);
+	assert.equal(result.warnings.length, 2);
+});
+
+test('a workspace that declares no owner-only keys marks none', () => {
+	assert.deepEqual(readCuration({ projectRoot: makeRoot({}) }).ownerOnlyKeys, []);
+	assert.deepEqual(readCuration({ projectRoot: makeRoot() }).ownerOnlyKeys, []);
 });
 
 test('a bypass missing guard or text is dropped with a warning', () => {

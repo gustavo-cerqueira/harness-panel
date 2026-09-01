@@ -7,7 +7,7 @@ and deep-links each row to its real source file and line.
 ## Why it exists
 
 Harness configuration is spread across at least five layers, two home-directory
-files, a plugin cache, and ~30 git worktrees. Answering "which value is actually
+files, a plugin cache, and however many git worktrees the repository has. Answering "which value is actually
 live, and which file sets it" by hand is slow and error-prone — and a wrong
 answer is worse than no answer, because it is acted on. The panel answers that
 question from disk, every time, with a link straight to the line.
