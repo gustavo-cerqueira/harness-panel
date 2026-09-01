@@ -13,8 +13,19 @@ node server.mjs
 bin/start.sh
 ```
 
-It inventories the repository it is started in. Point it elsewhere with
-`HARNESS_REPO`, and change the port with `HARNESS_PORT` (default 4546).
+It inventories the repository it is started in — `bin/start.sh` resolves that
+from git, so running it anywhere inside a checkout reads the whole checkout.
+
+| Variable                   | Default        | What it does                                                            |
+| -------------------------- | -------------- | ----------------------------------------------------------------------- |
+| `HARNESS_PORT`             | `4546`         | Port to bind on `127.0.0.1`.                                            |
+| `HARNESS_REPO`             | the git root   | Which repository to inventory, overriding where you started it.          |
+| `HARNESS_WORKSPACE_ROOTS`  | `~/projects`   | Colon-separated directories to look for repositories in. Every git repo found under them, and each of its worktrees, appears in the header's working-tree selector — and nothing outside them can ever be read. |
+| `HARNESS_ANCHOR_REF`       | see below      | The branch the `Source of truth` card compares against.                  |
+| `HARNESS_USAGE_SESSIONS`   | `50`           | How many recent session transcripts the usage counts are mined from.     |
+
+So you can start it once and switch repositories from the header rather than
+restarting it per project.
 
 ## Guardrails, first
 
