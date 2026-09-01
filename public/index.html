@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Harness Control Panel</title>
+		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+		<link rel="stylesheet" href="/style.css" />
+	</head>
+	<body>
+		<header>
+			<h1>Harness Control Panel</h1>
+			<span class="readonly-pill" title="This panel never writes to any config file. Every row links to its source so your editor does the writing.">READ-ONLY</span>
+			<select id="harness" title="Which agent harness to inventory. Claude Code reads ~/.claude and .claude/; Codex CLI reads ~/.codex, ~/.agents and .codex/ — same machine, two realities.">
+				<option value="claude" selected>Claude Code</option>
+				<option value="codex">Codex CLI</option>
+			</select>
+			<select id="scope" title="Which layers to show. User covers everything outside the repo (~/.claude, ~/.claude.json, plugins) — one reality per machine. Project covers the repo's tracked config plus this checkout's per-machine settings.">
+				<option value="all" selected>All scopes</option>
+				<option value="user">User only</option>
+				<option value="project">Project only</option>
+			</select>
+			<select id="root" title="Which working tree to read. Every option is a real git worktree on disk, read as it actually is — including its own untracked settings.local.json."></select>
+			<input id="search" type="search" placeholder="Filter every row — key, path, layer, value…" autocomplete="off" spellcheck="false" />
+			<button id="refresh" type="button" title="Re-read every config file from disk now">Refresh</button>
+			<button id="snap-save" type="button" title="Download the current inventory as a JSON snapshot. Nothing is written on the server — the panel stays read-only.">Save snapshot</button>
+			<button id="snap-load" type="button" title="Pick a snapshot file saved earlier and see what changed since then">Compare…</button>
+			<input id="snap-file" type="file" accept="application/json,.json" hidden />
+			<span id="status">loading…</span>
+		</header>
+
+		<div class="layout">
+			<nav id="nav" aria-label="Component families"></nav>
+			<main id="main"></main>
+		</div>
+
+		<script src="/app.js" type="module"></script>
+	</body>
+</html>
