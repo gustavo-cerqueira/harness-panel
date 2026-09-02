@@ -15,6 +15,7 @@ bin/start.sh
 
 It inventories the repository it is started in — `bin/start.sh` resolves that
 from git, so running it anywhere inside a checkout reads the whole checkout.
+Started outside one, it falls back to its own, and you switch from the header.
 
 | Variable                   | Default        | What it does                                                            |
 | -------------------------- | -------------- | ----------------------------------------------------------------------- |

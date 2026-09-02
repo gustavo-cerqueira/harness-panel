@@ -12,7 +12,16 @@ APP_DIR="$(dirname "$HERE")"
 # The repository to inventory is the one you are standing in, resolved to its
 # root so running this from a subdirectory still reads the whole checkout.
 # HARNESS_REPO wins when set, which is how a launcher pins a fixed workspace.
-REPO_ROOT="${HARNESS_REPO:-${EZ_HARNESS_REPO:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}}"
+#
+# Outside any checkout it falls back to THIS repository, not to the current
+# directory: run the panel from your home directory and `pwd` would point it at
+# your entire home, which it then tries to walk. Its own checkout is small and
+# always valid, and the header's tree selector reaches everything else.
+if [ -n "${HARNESS_REPO:-${EZ_HARNESS_REPO:-}}" ]; then
+	REPO_ROOT="${HARNESS_REPO:-$EZ_HARNESS_REPO}"
+else
+	REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$APP_DIR")"
+fi
 
 if curl -fsS -o /dev/null --max-time 2 "${URL}/api/state" 2>/dev/null; then
 	echo "Harness Control Panel already running -> ${URL}"
