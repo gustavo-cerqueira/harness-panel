@@ -319,3 +319,102 @@ test('resolveAnchorRef falls back to the repo default branch via origin/HEAD whe
 	assert.equal(result.error, null);
 	assert.deepEqual(result.tried, ['dev', 'main', 'master', 'trunk']);
 });
+
+// ---------------------------------------------------------------------------
+// Where to look when nobody said
+
+test('with no bases and no ~/projects, the neighbours of the started repo are searched', () => {
+	// The `~/projects` default is a guess about one machine's layout. Somebody
+	// who keeps repositories in ~/code got a selector holding only the one repo
+	// they happened to start in, and no hint that a setting existed.
+	const home = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-roots-home-'));
+	const code = path.join(home, 'code');
+	fs.mkdirSync(code);
+	const started = makeGitRepo(code, 'started-here', 'main');
+	const sibling = makeGitRepo(code, 'a-neighbour', 'main');
+
+	const discovery = discoverWorkspaceRoots({ home, extraRoots: [started] });
+	const paths = discovery.roots.map((root) => fs.realpathSync(root.path));
+	assert.ok(paths.includes(fs.realpathSync(started)), 'the repo it was started in');
+	assert.ok(paths.includes(fs.realpathSync(sibling)), 'and the repo next to it');
+});
+
+test('an existing ~/projects still wins over the started repo neighbourhood', () => {
+	const home = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-roots-home-'));
+	const projects = path.join(home, 'projects');
+	fs.mkdirSync(projects);
+	const inProjects = makeGitRepo(projects, 'lives-in-projects', 'main');
+	const elsewhere = path.join(home, 'elsewhere');
+	fs.mkdirSync(elsewhere);
+	const started = makeGitRepo(elsewhere, 'started-here', 'main');
+	makeGitRepo(elsewhere, 'a-neighbour', 'main');
+
+	const discovery = discoverWorkspaceRoots({ home, extraRoots: [started] });
+	const paths = discovery.roots.map((root) => fs.realpathSync(root.path));
+	assert.ok(paths.includes(fs.realpathSync(inProjects)), '~/projects is still searched');
+	assert.ok(paths.includes(fs.realpathSync(started)), 'the started repo is always present');
+	assert.equal(
+		paths.some((entry) => entry.endsWith('/a-neighbour')),
+		false,
+		'its neighbours are not searched when ~/projects exists',
+	);
+});
+
+test('the home directory itself is never turned into a search base', () => {
+	// A repository checked out directly in $HOME would otherwise make the panel
+	// walk the entire home directory looking for more.
+	const home = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-roots-home-'));
+	const started = makeGitRepo(home, 'repo-in-home', 'main');
+	fs.mkdirSync(path.join(home, 'Documents'));
+
+	const discovery = discoverWorkspaceRoots({ home, extraRoots: [started] });
+	// Compared without realpath: the base it falls back to naming here does not
+	// exist, and resolving a missing path throws.
+	const realHome = fs.realpathSync(home);
+	assert.equal(
+		discovery.bases.some((base) => path.resolve(base.path) === realHome || base.path === home),
+		false,
+		'$HOME must never be a base',
+	);
+	const paths = discovery.roots.map((root) => fs.realpathSync(root.path));
+	assert.deepEqual(paths, [fs.realpathSync(started)], 'only the started repo');
+});
+
+test('a ~/projects that exists but is unusable is named, and does NOT widen the search', () => {
+	// A symlink to an unmounted drive resolves to nothing, exactly like a
+	// missing directory does — but the two mean opposite things. One is "you
+	// never had this convention"; the other is "your convention is broken right
+	// now". Treating the second as the first silently searched the started
+	// repo's neighbours instead, and never mentioned the broken path at all.
+	const home = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-roots-home-'));
+	fs.symlinkSync(path.join(home, 'no-such-volume'), path.join(home, 'projects'), 'dir');
+	const code = path.join(home, 'code');
+	fs.mkdirSync(code);
+	const started = makeGitRepo(code, 'started-here', 'main');
+	makeGitRepo(code, 'a-neighbour', 'main');
+
+	const discovery = discoverWorkspaceRoots({ home, extraRoots: [started] });
+	assert.ok(
+		discovery.bases.some((base) => base.path.endsWith('/projects') && base.exists === false && base.error),
+		'the broken base must be reported, not silently skipped',
+	);
+	const paths = discovery.roots.map((root) => fs.realpathSync(root.path));
+	assert.deepEqual(paths, [fs.realpathSync(started)], 'only the started repo, as before');
+});
+
+test('the repo it was started in survives even when no base can be resolved', () => {
+	// `extraRoots` is what the caller is certain about. Returning early on "no
+	// base" threw that away too, leaving an empty selector for a session that
+	// plainly had a repository open.
+	// The case that actually reaches it: a directory whose parent IS the
+	// filesystem root, which the neighbourhood guard refuses. With no home
+	// either, no base resolves at all — and the early return took the started
+	// root down with it.
+	const discovery = discoverWorkspaceRoots({ extraRoots: ['/tmp'] });
+	assert.equal(
+		discovery.roots.some((root) => fs.realpathSync(root.path) === fs.realpathSync('/tmp')),
+		true,
+		'the started root is always listed',
+	);
+	assert.equal(discovery.bases.length, 0, 'and no base was invented for it');
+});

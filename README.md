@@ -21,7 +21,7 @@ Started outside one, it falls back to its own, and you switch from the header.
 | -------------------------- | -------------- | ----------------------------------------------------------------------- |
 | `HARNESS_PORT`             | `4546`         | Port to bind on `127.0.0.1`.                                            |
 | `HARNESS_REPO`             | the git root   | Which repository to inventory, overriding where you started it.          |
-| `HARNESS_WORKSPACE_ROOTS`  | `~/projects`   | Colon-separated directories to look for repositories in. Every git repo found under them, and each of its worktrees, appears in the header's working-tree selector — and nothing outside them can ever be read. |
+| `HARNESS_WORKSPACE_ROOTS`  | see below      | Colon-separated directories to look for repositories in. Every git repo found under them, and each of its worktrees, appears in the header's working-tree selector — and nothing outside them can ever be read. Unset, the panel looks in `~/projects` if you have one, and otherwise alongside the repository you started it in. Neither `$HOME` itself nor the filesystem root is ever searched. **Set it explicitly in CI or a container**, where the checkout's neighbours are other people's work rather than your own. |
 | `HARNESS_ANCHOR_REF`       | see below      | The branch the `Source of truth` card compares against.                  |
 | `HARNESS_USAGE_SESSIONS`   | `50`           | How many recent session transcripts the usage counts are mined from.     |
 
